@@ -104,7 +104,11 @@ El proyecto utiliza dos datasets principales obtenidos de **Civio**, una fundaci
 
 ### Descarga de datos
 
-⚠️ **Importante:** Los datos no están incluidos en este repositorio debido a su tamaño (~500MB) y restricciones de licencia.
+⚠️ **Importante:** Los datos no están incluidos en este repositorio debido a su tamaño (~686 MB total) y restricciones de licencia.
+
+**Archivos requeridos:**
+- `incendios_1968_2023.csv` (30 MB) - Registro histórico de incendios (628K registros)
+- `fwi_historico.csv` (656 MB) - Índices meteorológicos FWI
 
 **Pasos para obtener los datos:**
 
@@ -117,10 +121,10 @@ El proyecto utiliza dos datasets principales obtenidos de **Civio**, una fundaci
    - `fwi_historico.csv` → Guardar en `data/raw/`
 
 3. **Verificar descarga:**
-   ```bash
+```bash
    ls -lh data/raw/
-   # Deberías ver ambos archivos CSV
-   ```
+   # Deberías ver: incendios_1968_2023.csv (30M) y fwi_historico.csv (656M)
+```
 
 ### Exploración inicial
 
