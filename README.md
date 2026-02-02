@@ -150,13 +150,26 @@ El proyecto utiliza dos datasets principales obtenidos de **Civio**, una fundaci
 
 ### Exploración inicial
 
-**[TODO: Completar tras EDA]**
+**Análisis completado (ver `notebooks/01_EDA.ipynb`):**
 
-- Total de registros analizados: [X]
-- Período temporal: [1968-2023]
-- Porcentaje de GIF en el dataset: [Y%] (clase desbalanceada)
-- Variables con valores nulos: [lista]
-- Distribución temporal de incendios: [insight]
+- **Total de registros:** 292,181 incendios (1968-2023)
+- **Período válido para modelado:** 1968-2020 (años 2021-2023 tienen datos incompletos)
+- **Variable objetivo (GIF):** 1,981 casos (0.68% del total)
+- **Desbalanceo de clases:** 146:1 (No-GIF:GIF) - requiere SMOTE y scale_pos_weight
+- **Valores nulos críticos:** 
+  - Coordenadas (lat/lng): 18.6% faltantes (54,435 incendios)
+  - Resto de variables: completas
+- **Distribución temporal:**
+  - Mes crítico: Agosto (60,572 incendios, 20.7% del total)
+  - Año pico: 1989 (15,922 incendios) - posible outlier
+- **Distribución geográfica:**
+  - Noroeste (Galicia/Asturias): muchos incendios, bajo % de GIF (<1%)
+  - Centro/Sur (Ávila, Burgos, Albacete): menos incendios, alto % de GIF (2-3%)
+- **Índice FWI:**
+  - 46% de días con riesgo bajo (FWI < 5.2)
+  - 24.5% de días con riesgo muy alto/extremo (FWI > 21.3)
+  - **Problema detectado:** Dataset FWI usa coordenadas (x,y), no tiene `idprovincia` → merge requiere geocodificación
+- **Outliers:** 14.98% de incendios (son GIF reales, se mantienen para el modelo)
 
 ---
 
