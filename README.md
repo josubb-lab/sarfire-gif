@@ -43,9 +43,11 @@ Este trabajo forma parte de un ecosistema mayor denominado **SARFIRE** (Sistema 
 ### Problema a resolver
 
 Los **Grandes Incendios Forestales (GIF)**, definidos como aquellos que afectan a más de 500 hectáreas, representan:
-- Solo el **[TODO: X%]** del total de incendios en España
-- Pero causan el **[TODO: Y%]** del total de hectáreas quemadas
-- Y concentran el **[TODO: Z%]** de los costes de extinción
+- Aproximadamente el **3-5%** del total de incendios en España
+- Pero causan más del **70%** del total de hectáreas quemadas
+- Y concentran más del **80%** de los costes de extinción
+
+**El problema crítico:** Cuando un incendio inicia, los primeros 30-60 minutos son decisivos. Si no se detecta su potencial para convertirse en GIF, la ventana de oportunidad para una respuesta efectiva se cierra.
 
 La detección temprana de un incendio con potencial para convertirse en GIF permite:
 1. **Priorización de recursos:** Envío inmediato de medios aéreos y brigadas especializadas
@@ -53,20 +55,40 @@ La detección temprana de un incendio con potencial para convertirse en GIF perm
 3. **Reducción de costes:** Menor superficie afectada = menores costes de extinción y recuperación
 4. **Protección ambiental:** Mitigación del impacto ecológico
 
+### Objetivo del modelo
+
+**Predecir la probabilidad de que un incendio se convierta en GIF basándose en:**
+- Condiciones meteorológicas (FWI y componentes)
+- Ubicación geográfica (provincia/región)
+- Temporalidad (mes, día, estación)
+- Características iniciales del incendio
+
+**Momento de predicción:** Durante las primeras **2-4 horas** desde el inicio del incendio, cuando aún hay margen de maniobra para movilizar recursos adicionales.
+
 ### Impacto esperado
 
-Si el modelo identifica correctamente el **80%** de los GIF en sus primeras horas:
-- **[TODO: Estimación de hectáreas salvadas]**
-- **[TODO: Reducción de coste estimado]**
-- **[TODO: Recursos optimizados]**
+Si el modelo identifica correctamente el **85%** de los GIF en sus primeras horas:
 
-El modelo no sustituye la experiencia de los profesionales, sino que actúa como **sistema de alerta temprana** que complementa la toma de decisiones operativas.
+**Métricas de negocio (se calcularán con datos reales):**
+- **Hectáreas protegidas:** Estimación basada en superficie promedio de GIF × tasa de detección
+- **Ahorro económico:** Coste medio de extinción (~3.000 €/ha) + recuperación (~5.000 €/ha)
+- **Recursos optimizados:** Reducción de falsas alarmas y movilizaciones innecesarias
+
+**Restricción crítica:** El modelo **prioriza Recall sobre Precision**
+- ✅ **Falso Positivo** (movilizar recursos innecesarios) → Coste asumible
+- ⚠️ **Falso Negativo** (no detectar un GIF) → **CRÍTICO** → Miles de hectáreas en riesgo
+
+**Aclaración importante:** El modelo no sustituye la experiencia de los profesionales, sino que actúa como **sistema de alerta temprana** que complementa la toma de decisiones operativas.
 
 ### Tipo de problema
 
-- **Variable objetivo:** Binaria categórica (GIF: Sí/No)
-- **Enfoque:** Clasificación supervisada con datos tabulares históricos
-- **Justificación:** La naturaleza binaria del problema (>500 ha vs ≤500 ha) permite una definición clara del objetivo y facilita la interpretación operativa. Además, los datos históricos disponibles (incendios + meteorología) son ideales para modelos de aprendizaje supervisado basados en árboles de decisión (XGBoost, Random Forest).
+- **Variable objetivo:** Binaria categórica (GIF: Sí/No, umbral: 500 hectáreas)
+- **Enfoque:** Clasificación supervisada con datos tabulares históricos (50 años)
+- **Métrica principal:** **Recall (Sensibilidad)** - Detectar el máximo de GIF posibles
+- **Métrica secundaria:** F1-Score - Balance entre Recall y Precision
+
+**Justificación técnica:** 
+La naturaleza binaria del problema (>500 ha vs ≤500 ha) permite una definición operativa clara y facilita la interpretación por parte de los equipos de extinción. Los datos históricos disponibles (628K incendios + índices meteorológicos FWI) son ideales para modelos de aprendizaje supervisado basados en árboles de decisión (XGBoost, Random Forest), que manejan bien variables mixtas (numéricas y categóricas) y clases desbalanceadas.
 
 ---
 
