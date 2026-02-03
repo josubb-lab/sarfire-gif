@@ -247,54 +247,85 @@ El sistema sigue un pipeline de Machine Learning end-to-end compuesto por las si
 
 ---
 
-## 🛠️ Preprocesamiento y Feature Engineering
+## 🛠️ Preprocesamiento, limpieza y Feature Engineering
 
 ### Limpieza de datos
 
-**[TODO: Completar tras implementación]**
+**Problemas detectados y resueltos:**
 
-**Problemas detectados:**
-1. **Valores nulos en superficie afectada:** [estrategia aplicada]
-2. **Fechas inconsistentes:** [tratamiento]
-3. **Provincias con nomenclatura variable:** [normalización]
-4. **Valores atípicos en costes:** [decisión tomada]
+1. **Años con datos incompletos (2021-2023):**
+   - Problema: Solo 1,137 incendios en 3 años (vs ~5,000/año esperado)
+   - Solución: Excluir del análisis, usar período 1968-2020
+   
+2. **Valores nulos en coordenadas (18.6%):**
+   - Problema: 54,435 incendios sin lat/lng
+   - Solución: No crítico tras merge agregado por provincia
+   
+3. **Valores atípicos en superficie:**
+   - Problema: 14.98% outliers estadísticos (>22.55 ha)
+   - Decisión: **Mantener** (los GIF son outliers por definición)
 
 **Transformaciones aplicadas:**
-- [Descripción de cada transformación]
+- Parseo de fechas a formato datetime
+- Filtrado temporal: 1968-2020
+- Normalización de IDs provinciales
 
-### Merge temporal
+### Merge temporal (FWI + Incendios)
 
-El cruce entre el dataset de incendios y el FWI se realiza mediante:
-- **Clave de join:** `(fecha, provincia)`
-- **Estrategia:** Left join desde incendios
-- **Justificación:** Queremos mantener todos los incendios aunque no tengan FWI disponible (rellenar con media histórica)
+**Estrategia implementada: Opción A (Agregación Provincial)**
 
-**Pérdida de datos tras merge:** [TODO: X% de incendios sin FWI]
+El cruce entre incendios y FWI se realiza mediante:
+
+- **Paso 1:** Asignar provincia a cada coordenada FWI (x, y)
+  - Método: Distancia euclidiana a centroide provincial
+  - Resultado: 18.5M puntos FWI → idprovincia asignado
+  
+- **Paso 2:** Agregar FWI por (fecha, provincia)
+  - Métricas: `fwi_mean`, `fwi_max`, `fwi_p90`
+  - Reducción: 18.5M → ~300K registros agregados
+  
+- **Paso 3:** Join con incendios
+  - Clave: `(fecha, idprovincia)`
+  - Tipo: Left join (mantener todos los incendios)
+  - Imputación nulos: Media provincial/mensual
+
+**Justificación de la estrategia:**
+- Equilibrio precisión/viabilidad técnica
+- FWI captura contexto meteorológico regional
+- Orografía local capturada vía municipio/región
+- Usa 100% de incendios (incluye 18.6% sin coordenadas)
+
+**Pérdida de datos tras merge:** 0% (left join + imputación)
 
 ### Feature Engineering
 
 **Variables creadas:**
 
-1. **Temporales:**
-   - `mes` (1-12): Estacionalidad
-   - `dia_semana` (0-6): Patrón semanal
-   - `estacion` (primavera, verano, otoño, invierno)
-   - `es_verano` (binaria): Período de máximo riesgo
+**1. Temporales:**
+- `mes` (1-12): Estacionalidad del riesgo
+- `dia_semana` (0-6): Patrón semanal
+- `estacion` (invierno/primavera/verano/otoño): Agrupación estacional
+- `es_verano` (boolean): Período crítico (junio-septiembre)
+- `año`: Tendencias temporales
 
-2. **Geográficas:**
-   - `region` (Norte, Centro, Sur, Levante, Canarias): Agrupación de provincias
-   - `densidad_forestal` (estimada por provincia)
+**2. Geográficas:**
+- `region` (8 categorías): Zonas climáticas de España
+  - Noroeste, Norte, Nordeste, Centro, Levante, Sur, Canarias, Baleares
+- `municipio_encoded`: Captura idiosincrasia local/orográfica (LabelEncoder)
 
-3. **Derivadas del FWI:**
-   - `fwi_categoria` (Bajo, Moderado, Alto, Extremo): Discretización del FWI continuo
-   - `dias_sequia` (acumulado): Contador de días consecutivos con DC alto
+**3. Derivadas del FWI:**
+- `fwi_mean`: Promedio provincial diario (condición general)
+- `fwi_max`: Máximo provincial (captura extremos locales)
+- `fwi_p90`: Percentil 90 (robusto a outliers)
+- `fwi_cat` (5 categorías): bajo/moderado/alto/muy_alto/extremo
+  - Umbrales: 0-5.2 / 5.2-11.2 / 11.2-21.3 / 21.3-38.0 / >38.0
 
 **Justificación de features:**
-- **Estacionalidad:** Los incendios forestales tienen un claro patrón estacional (verano = mayor riesgo)
-- **Región:** Diferentes zonas de España tienen vegetación y clima distintos
-- **FWI categórico:** Facilita la interpretación operativa ("riesgo extremo" es más accionable que "FWI=45.7")
-
----
+- **Mes/Estación:** Patrón estacional fuerte (agosto = 20.7% incendios)
+- **Región:** Captura diferencias climáticas norte (húmedo) vs centro/sur (seco)
+- **Municipio:** Proxy de orografía específica (valles, laderas) que precipita GIF
+- **FWI_max:** Más predictivo que promedio para eventos extremos
+- **FWI_cat:** Interpretabilidad operativa para protocolos de actuación
 
 ## 🤖 Modelado
 
