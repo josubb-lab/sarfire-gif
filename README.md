@@ -329,117 +329,120 @@ El cruce entre incendios y FWI se realiza mediante:
 
 ## 🤖 Modelado
 
-### Definición de la variable objetivo
+### Baseline (ver `notebooks/03_Modeling_Baseline.ipynb`)
 
+**Objetivo:** Establecer punto de referencia con modelos simples antes de optimizar.
+
+**Modelos probados:**
+
+#### 1. Logistic Regression (baseline simple)
+**Configuración:**
 ```python
-# Variable objetivo: GIF (Grande Incendio Forestal)
-y = (df['superficie_ha'] > 500).astype(int)
+LogisticRegression(
+    class_weight='balanced',
+    max_iter=1000,
+    random_state=42
+)
 ```
 
-**Distribución de clases:**
-- Clase 0 (No-GIF): [TODO: X%]
-- Clase 1 (GIF): [TODO: Y%]
-- **Desbalanceo:** ~[TODO: Z:1]
+**Resultados:**
+- ⭐ **Recall: 43.4%** (detecta 49 de 113 GIF en test)
+- Precision: 3.0%
+- F1-Score: 5.6%
+- ROC-AUC: 83.0%
+
+**Conclusión:** ✅ Modelo simple captura bien el patrón principal. Establece baseline sólido.
+
+---
+
+#### 2. XGBoost sin optimizar
+**Configuración:**
+```python
+XGBClassifier(
+    scale_pos_weight=147.5,  # Ratio calculado del desbalanceo
+    max_depth=6,
+    n_estimators=100,
+    learning_rate=0.3,
+    eval_metric='logloss',
+    random_state=42
+)
+```
+
+**Resultados:**
+- ⭐ **Recall: 10.6%** (solo detecta 12 de 113 GIF)
+- Precision: 2.1%
+- F1-Score: 3.5%
+- ROC-AUC: 77.5%
+
+**Conclusión:** ⚠️ XGBoost demasiado conservador con hiperparámetros por defecto. Necesita optimización.
+
+---
+
+### Features utilizadas (9 totales)
+
+**Categóricas (5):**
+- `fwi_cat` (bajo/moderado/alto/muy_alto/extremo)
+- `estacion` (invierno/primavera/verano/otoño)
+- `region` (8 zonas climáticas de España)
+- `dia_semana` (0-6)
+- `mes` (1-12)
+
+**Numéricas (4):**
+- `fwi_mean` (promedio FWI provincial diario)
+- `fwi_max` (máximo FWI provincial - captura extremos)
+- `fwi_p90` (percentil 90 FWI - robusto a outliers)
+- `año` (1968-2020)
+
+**Features excluidas del baseline:**
+- `municipio_encoded`: 19.75% valores "INDETERMINADO" + 7,050 categorías únicas
+  - Justificación: Ruido significativo, se evaluará en fase de optimización
+- Metadata: `id`, `fecha`
+- Leakage: `superficie` (define directamente el target GIF)
+- Redundantes: `idmunicipio`, `municipio`, `idprovincia`, `es_verano`
+
+---
 
 ### Estrategia de validación
 
 **Split temporal (NO aleatorio):**
-- **Train:** 1968-2018 (80% de los datos)
-- **Test:** 2019-2023 (20% de los datos)
-
-**Justificación:** En series temporales, el modelo debe predecir el futuro. Un split aleatorio provocaría **data leakage** (entrenar con datos del futuro para predecir el pasado).
-
-**Cross-validation:** Time Series Split con 5 folds sobre el conjunto de entrenamiento.
-
-### Modelos evaluados
-
-#### 1. Random Forest (Baseline)
-
-**Configuración:**
-```python
-RandomForestClassifier(
-    n_estimators=100,
-    max_depth=20,
-    min_samples_split=50,
-    class_weight='balanced',
-    random_state=42
-)
-```
-
-**Justificación:** Modelo robusto y fácil de interpretar. Buen punto de partida para datos tabulares.
-
-**Resultados:**
-- F1-Score (GIF): [TODO]
-- Recall (GIF): [TODO]
-
----
-
-#### 2. XGBoost (Modelo principal) ⭐
-
-**Configuración:**
-```python
-XGBClassifier(
-    n_estimators=200,
-    max_depth=8,
-    learning_rate=0.05,
-    scale_pos_weight=10,  # Crucial para clases desbalanceadas
-    subsample=0.8,
-    colsample_bytree=0.8,
-    random_state=42
-)
-```
+- **Train:** 1968-2015 (275,302 registros, 1,854 GIF - 0.67%)
+- **Test:** 2016-2020 (15,742 registros, 113 GIF - 0.72%)
 
 **Justificación:** 
-- **Rendimiento superior** en datasets tabulares con clases desbalanceadas
-- **Parámetro `scale_pos_weight`** permite dar más peso a la clase minoritaria (GIF)
-- **Regularización integrada** reduce overfitting
-- **Compatibilidad con SHAP** para explicabilidad
-
-**Hiperparámetros optimizados mediante GridSearchCV:**
-- [TODO: Describir proceso de optimización]
-
-**Resultados:**
-- F1-Score (GIF): [TODO]
-- Recall (GIF): [TODO] ← Métrica crítica
+- Evita data leakage temporal
+- Simula predicción en producción (entrenar con pasado, predecir futuro)
+- Desbalanceo consistente entre train/test (~147:1)
 
 ---
 
-#### 3. LightGBM (Comparación)
+### Tratamiento del desbalanceo
 
-**Configuración:**
-```python
-LGBMClassifier(
-    n_estimators=200,
-    max_depth=8,
-    learning_rate=0.05,
-    is_unbalance=True,
-    random_state=42
-)
-```
+**Baseline:**
+- Logistic Regression: `class_weight='balanced'` ✅ Funciona bien
+- XGBoost: `scale_pos_weight=147.5` ⚠️ Demasiado conservador
 
-**Justificación:** Alternativa más rápida a XGBoost, útil para datasets muy grandes.
-
-**Resultados:**
-- F1-Score (GIF): [TODO]
-- Recall (GIF): [TODO]
+**Próxima fase (Optimización):**
+- Ajustar `scale_pos_weight` (probar 50-200)
+- GridSearch sobre otros hiperparámetros
+- Evaluar SMOTE si es necesario
+- Considerar ensemble
 
 ---
 
-### Tratamiento del desbalanceo de clases
+### Resultado clave del baseline
 
-**Técnica aplicada:** SMOTE (Synthetic Minority Over-sampling Technique)
+> **Logistic Regression (modelo más simple) supera a XGBoost sin optimizar**
+> 
+> Esto valida que:
+> 1. ✅ El pipeline de preprocesamiento funciona correctamente
+> 2. ✅ Las features tienen poder predictivo (ROC-AUC ~80%)
+> 3. ✅ El problema es resoluble (baseline detecta 43% de GIF)
+> 4. ⚠️ XGBoost necesita tuning cuidadoso para aprovechar su potencial
 
-```python
-from imblearn.over_sampling import SMOTE
+**Métrica objetivo:** Recall >85% (detectar 85% de GIF)
+**Estado actual:** Recall 43.4% → Margen de mejora significativo
 
-smote = SMOTE(sampling_strategy=0.5, random_state=42)
-X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
-```
-
-**Justificación:** SMOTE genera ejemplos sintéticos de la clase minoritaria (GIF) interpolando entre instancias existentes, mejorando la capacidad del modelo para detectar patrones en esta clase crítica.
-
-**Alternativas evaluadas:**
-- [TODO: Random undersampling, class_weight, etc.]
+**Próximo paso:** Notebook 04 - Optimización de XGBoost con GridSearch
 
 ---
 
