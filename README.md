@@ -446,6 +446,56 @@ XGBClassifier(
 
 ---
 
+---
+
+## 🎯 Optimización del Modelo
+
+### Notebook 04: Optimización XGBoost con GridSearch ✅
+
+**Duración:** 1 sesión (~70 minutos GridSearch)  
+**Fecha:** 8 Febrero 2026
+
+#### Estrategia de optimización
+
+**GridSearchCV con TimeSeriesSplit:**
+- 5 folds temporales
+- 120 combinaciones de hiperparámetros
+- 600 fits totales
+- Scoring: `recall` (métrica prioritaria)
+
+**Hiperparámetros optimizados:**
+```python
+param_grid = {
+    'scale_pos_weight': [75, 100, 125, 150, 200],
+    'max_depth': [6, 8, 10],
+    'n_estimators': [100, 200],
+    'learning_rate': [0.05, 0.1],
+    'min_child_weight': [1, 3],
+    'subsample': [0.8],
+    'colsample_bytree': [0.8]
+}
+```
+
+#### Mejores hiperparámetros encontrados
+```python
+{
+    'scale_pos_weight': 200,      # vs 147.5 baseline
+    'max_depth': 6,
+    'n_estimators': 100,
+    'learning_rate': 0.05,
+    'min_child_weight': 1,
+    'subsample': 0.8,
+    'colsample_bytree': 0.8
+}
+```
+
+**Conclusión técnica:**
+- `scale_pos_weight=200` (vs 147.5 del ratio) resultó óptimo
+- Modelo conservador en profundidad (max_depth=6) evita overfitting
+- Learning rate bajo (0.05) con 100 árboles da mejor generalización
+
+---
+
 ## 📈 Evaluación y Métricas
 
 ### Métricas técnicas
@@ -458,50 +508,93 @@ Por tanto, **priorizamos Recall** sobre Precision.
 
 #### Métricas principales
 
-1. **Recall (Sensibilidad)** - Métrica crítica
+1. **Recall (Sensibilidad)** - Métrica crítica ⭐
    - **Definición:** De todos los GIF reales, ¿cuántos detectamos?
    - **Objetivo:** > 85%
-   - **Resultado obtenido:** [TODO: X%]
+   - **Logistic Regression (baseline):** 43.4%
+   - **XGBoost sin optimizar:** 10.6%
+   - **XGBoost optimizado:** **70.8%** ✅
+   - **Interpretación:** Detecta 80 de 113 GIF en test
 
 2. **F1-Score** - Balance Recall/Precision
-   - **Resultado obtenido:** [TODO: X]
+   - **Logistic Regression:** 5.6%
+   - **XGBoost sin optimizar:** 3.5%
+   - **XGBoost optimizado:** **5.4%**
 
 3. **Precision**
    - **Definición:** De todos los incendios que clasificamos como GIF, ¿cuántos lo son realmente?
-   - **Resultado obtenido:** [TODO: X%]
+   - **Logistic Regression:** 3.0%
+   - **XGBoost sin optimizar:** 2.1%
+   - **XGBoost optimizado:** **2.8%**
 
 4. **ROC-AUC**
-   - **Resultado obtenido:** [TODO: X]
+   - **Logistic Regression:** 83.0%
+   - **XGBoost sin optimizar:** 77.5%
+   - **XGBoost optimizado:** **82.6%**
 
 ### Matriz de confusión
 
-**[TODO: Insertar matriz de confusión del modelo final]**
-
+**XGBoost Optimizado (Test 2016-2020):**
 ```
                     Predicción
                  No-GIF    GIF
-Real  No-GIF       TN      FP
-      GIF          FN      TP
+Real  No-GIF      12868   2761
+      GIF            33     80
 ```
 
 **Interpretación operativa:**
-- **TN (True Negative):** Incendios pequeños correctamente identificados → OK
-- **TP (True Positive):** GIF correctamente detectados → EXCELENTE
-- **FP (False Positive):** Movilizar recursos innecesariamente → Coste asumible
-- **FN (False Negative):** No detectar un GIF → CRÍTICO, minimizar
+- **TN (12,868):** Incendios pequeños correctamente identificados → OK
+- **TP (80):** GIF correctamente detectados → **EXCELENTE** (70.8% recall)
+- **FP (2,761):** Movilizar recursos innecesariamente → Coste asumible (esperado con desbalanceo 147:1)
+- **FN (33):** No detectar un GIF → **CRÍTICO** (29.2% aún sin detectar, margen de mejora)
 
 ### Comparación de modelos
 
-| Modelo | Recall (GIF) | F1-Score | ROC-AUC | Tiempo entrenamiento |
-|--------|--------------|----------|---------|----------------------|
-| Random Forest | [TODO] | [TODO] | [TODO] | [TODO] |
-| **XGBoost** | **[TODO]** | **[TODO]** | **[TODO]** | **[TODO]** |
-| LightGBM | [TODO] | [TODO] | [TODO] | [TODO] |
+| Modelo | Recall (GIF) | Precision | F1-Score | ROC-AUC | Mejora vs LR |
+|--------|--------------|-----------|----------|---------|--------------|
+| Logistic Regression (baseline) | 43.4% | 3.0% | 5.6% | 83.0% | - |
+| XGBoost sin optimizar | 10.6% | 2.1% | 3.5% | 77.5% | -32.7pp ❌ |
+| **XGBoost optimizado** | **70.8%** | **2.8%** | **5.4%** | **82.6%** | **+27.4pp** ✅ |
 
-**Modelo seleccionado:** XGBoost
+**Modelo seleccionado:** XGBoost optimizado
 
 **Justificación de la elección:**
-- [TODO: Razones técnicas basadas en métricas]
+1. ✅ **Recall 70.8%** alcanza objetivo intermedio (>70%)
+2. ✅ **Mejora sustancial** (+27.4pp vs baseline simple)
+3. ✅ ROC-AUC 82.6% confirma buena capacidad discriminatoria
+4. ✅ GridSearch validó robustez con TimeSeriesSplit
+5. ⚠️ **Limitación:** 33 GIF siguen sin detectarse (posible mejora con SMOTE o features adicionales)
+
+### Feature Importance (Top 5)
+
+Variables más importantes en el modelo optimizado:
+
+1. **fwi_p90** (9.6%) - Percentil 90 FWI provincial (captura extremos sin outliers)
+2. **fwi_max** (7.6%) - FWI máximo provincial (picos meteorológicos)
+3. **region_nan** (5.6%) - Región desconocida (patrón inesperado)
+4. **año** (4.8%) - Tendencia temporal (cambio climático, mejoras gestión)
+5. **region_Sur** (3.5%) - Patrón geográfico (clima seco)
+
+**Conclusión:** Variables FWI dominan (~22% importancia combinada), validando estrategia de merge provincial.
+
+### Análisis de errores
+
+**Falsos Negativos (33 GIF no detectados):**
+- Probabilidad promedio de predicción: 27.8%
+- Interpretación: GIF con características atípicas, difíciles de predecir
+- Ejemplos: GIF en condiciones FWI bajas pero viento extremo local, o vegetación especialmente inflamable
+
+**Falsos Positivos (2,761 alertas innecesarias):**
+- Probabilidad promedio de predicción: 68.9%
+- Interpretación: Esperado con desbalanceo 147:1, trade-off aceptable
+- Coste operativo: Movilización preventiva asumible vs coste de GIF no detectado
+
+**Estado del objetivo:**
+- **Objetivo final:** Recall >85% (detectar 85 de cada 100 GIF)
+- **Estado actual:** Recall 70.8% (detecta 80 de 113 GIF)
+- **Margen de mejora:** ~15pp para alcanzar objetivo de producción
+
+**Próxima fase:** Explicabilidad con SHAP para interpretar decisiones del modelo y métricas de negocio
 
 ---
 
@@ -1084,5 +1177,30 @@ El código y la metodología están disponibles de forma abierta para fines acad
 
 ---
 
-**Última actualización:** [TODO: Fecha]  
+**Última actualización:** [09/02/2026]  
 **Versión del documento:** 1.0.0
+
+**Progreso: ~50% completado**
+
+**✅ COMPLETADO:**
+1. Infraestructura y setup (día 1)
+2. EDA completo con hallazgos (días 1-2)
+3. Preprocesamiento con merge FWI (día 3)
+4. Baseline validado (día 4)
+5. Optimización XGBoost con GridSearch (día 5)
+6. README actualizado continuamente
+7. Git con 20+ commits descriptivos
+
+**⏳ PENDIENTE (~50%):**
+1. **Explicabilidad SHAP** (día 6) ← SIGUIENTE
+   - Feature importance detallado
+   - Waterfall plots para casos específicos
+   - Summary plots globales
+2. **Métricas de negocio** (día 7)
+   - Hectáreas protegidas estimadas
+   - Costes evitados
+   - ROI del modelo
+3. **Documentación final** (día 8)
+   - README completo
+   - Conclusiones académicas
+   - Limitaciones y mejoras futuras
