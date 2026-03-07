@@ -594,7 +594,7 @@ Variables más importantes en el modelo optimizado:
 - **Estado actual:** Recall 70.8% (detecta 80 de 113 GIF)
 - **Margen de mejora:** ~15pp para alcanzar objetivo de producción
 
-**Próxima fase:** Explicabilidad con SHAP para interpretar decisiones del modelo y métricas de negocio
+**Próxima fase:** Métricas de negocio (hectáreas protegidas, costes evitados, ROI)
 
 ---
 
@@ -607,39 +607,130 @@ En un contexto operativo de emergencias, los profesionales necesitan **confiar**
 2. **Generar confianza:** Los bomberos entienden **por qué** el sistema alerta de un GIF
 3. **Mejorar el modelo:** Detectar features irrelevantes o faltantes
 
-### Técnica aplicada: SHAP (SHapley Additive exPlanations)
+---
 
-SHAP asigna a cada feature una contribución al valor predicho, basándose en teoría de juegos cooperativos.
+### FASE 5: EXPLICABILIDAD SHAP (COMPLETADA) ✅
 
-#### Feature Importance Global
+**Notebook:** `05_Explainability_SHAP.ipynb`
+**Duración:** 1 sesión (~10 minutos cálculo SHAP)
+**Fecha:** 8 Marzo 2026
 
-**[TODO: Insertar gráfico SHAP summary plot]**
+#### Objetivo:
+Explicar **POR QUÉ** el modelo XGBoost predice GIF, identificando:
+- Features más influyentes globalmente
+- Dirección del efecto (positivo/negativo hacia GIF)
+- Interacciones entre variables
+- Explicación de casos individuales (TP, FN, FP)
 
-**Variables más influyentes (Top 5):**
-1. **FWI (Fire Weather Index):** [TODO: Interpretación]
-2. **Superficie primeras 2 horas:** [TODO: Interpretación]
-3. **Mes del año:** [TODO: Interpretación]
-4. **Provincia/Región:** [TODO: Interpretación]
-5. **Días consecutivos de sequía:** [TODO: Interpretación]
+#### Técnica utilizada:
 
-#### Dependence Plots
+**SHAP (SHapley Additive exPlanations)**
+- TreeExplainer (optimizado para XGBoost)
+- Muestra: 1,000 registros de test
+- Tiempo de cálculo: ~3 minutos
 
-**[TODO: Insertar dependence plot de FWI vs predicción]**
+#### RESULTADOS - Top 5 Features más influyentes:
 
-**Interpretación:**
-- Cuando FWI > [X], la probabilidad de GIF aumenta exponencialmente
-- Existe interacción entre FWI y mes (verano + FWI alto = riesgo extremo)
+| Ranking | Feature | SHAP Importance | Interpretación |
+|---------|---------|-----------------|----------------|
+| 1 | **fwi_max** | 0.7299 | FWI máximo provincial - predictor dominante |
+| 2 | **fwi_p90** | 0.5356 | Percentil 90 FWI - condiciones extremas |
+| 3 | **año** | 0.4696 | Tendencia temporal |
+| 4 | **region_nan** | 0.2468 | Región desconocida - patrón inesperado |
+| 5 | **fwi_mean** | 0.2047 | FWI promedio provincial |
 
-#### Caso de estudio: Explicación de una predicción individual
+**Observación clave:** Las 3 métricas FWI (max, p90, mean) suman **1.47** de importancia → **meteorología domina la predicción**.
 
-**[TODO: Insertar force plot de un GIF correctamente detectado]**
+#### Insights del análisis SHAP:
 
-**Narrativa:**
-> "El modelo predice GIF (probabilidad: 87%) para este incendio porque:
-> - FWI=45 (muy alto) → +35% probabilidad
-> - Mes=Agosto → +20% probabilidad
-> - Provincia=Guadalajara → +15% probabilidad
-> - Días de sequía=12 → +10% probabilidad"
+##### 1. **Relación fwi_max ↔ Predicción GIF**
+- **Relación casi lineal positiva** hasta fwi_max ≈ 1.5 (normalizado)
+- **Umbral crítico detectado:** fwi_max > 1.5 → impacto se dispara exponencialmente
+- FWI extremo (>2.5) puede aportar hasta **+1.0 SHAP value** (diferencia entre No-GIF y GIF)
+
+##### 2. **Efecto de región desconocida (region_nan)**
+- Valores altos de `region_nan` → **impacto positivo consistente** hacia GIF
+- Posible explicación: incendios sin región asignada ocurren en zonas remotas/difíciles → mayor probabilidad de propagación incontrolada
+- **Interacción con FWI:** region_nan + FWI alto amplifica el riesgo
+
+##### 3. **Temporalidad (año, meses)**
+- `año` tiene **efecto variable** (no monotónico) → captura cambios en políticas/tecnología/clima
+- `mes_6` (junio) muestra **efecto protector** (valores altos reducen probabilidad GIF)
+- Agosto (mes_8) tiene efecto positivo moderado (esperado)
+
+##### 4. **Modelo principalmente aditivo**
+- Análisis de interacciones (SHAP interaction values) muestra **interacciones débiles**
+- El modelo suma efectos independientes de cada feature
+- No hay combinaciones complejas dominantes (simplicidad del modelo es fortaleza)
+
+#### Waterfall Plots - Casos individuales analizados:
+
+##### **Caso 1: True Positive (GIF detectado - 79.5% probabilidad)**
+```
+Características clave:
+- fwi_max = 2.64 → +0.95 SHAP value
+- fwi_p90 = 2.76 → +0.61
+- region_Levante → +0.33
+- Base value: 0.375 → Predicción final: 1.358 (79.5%)
+
+Conclusión: FWI extremo domina completamente la predicción.
+```
+
+##### **Caso 2: False Negative (GIF NO detectado - 26.8% probabilidad)**
+```
+Características clave:
+- año → -0.76 (efecto temporal negativo fuerte)
+- mes_6 → -0.65 (junio reduce riesgo)
+- region_nan → -0.50
+- fwi_max = 1.42 → +0.47 (moderado, no extremo)
+- Base value: 0.375 → Predicción final: -1.007 (26.8%)
+
+Conclusión: FWI moderado + factores temporales desfavorables 
+→ modelo subestima el riesgo. GIF probablemente causado por 
+factores no capturados (orografía local, viento puntual).
+```
+
+##### **Caso 3: False Positive (Falsa alarma - 92.7% probabilidad)**
+```
+Características clave:
+- fwi_max = 2.74 → +1.09 (extremo)
+- region_Nordeste → +0.61
+- fwi_p90 = 2.58 → +0.47
+- Base value: 0.375 → Predicción final: 2.538 (92.7%)
+
+Conclusión: FWI extremo activó alarma máxima. 
+Real: No fue GIF (posible control rápido o error en datos).
+Trade-off aceptable: priorizar detección sobre precisión.
+```
+
+#### Conclusiones del análisis SHAP:
+
+✅ **Validación del modelo:**
+- Features más importantes coinciden con conocimiento de dominio (meteorología crítica)
+- Relaciones interpretables (FWI alto → más riesgo)
+- No hay "magic" oculta en la caja negra
+
+⚠️ **Limitaciones identificadas:**
+- **Falsos Negativos:** Ocurren cuando FWI es moderado (1.4-1.5) pero otros factores locales (no capturados) favorecen propagación
+- **region_nan** tiene peso inesperadamente alto → posible mejora imputando región correctamente
+
+💡 **Recomendaciones para mejora:**
+1. **Feature engineering avanzado:**
+   - Crear features de interacción explícitas: `fwi_max * region_Sur`, `fwi_p90 * mes_8`
+   - Incluir variables de sequía acumulada (días sin lluvia previos)
+   - Orografía local (pendiente, orientación) si disponible
+
+2. **Umbrales adaptativos por región:**
+   - El umbral FWI crítico podría variar por región climática
+   - Modelo ensemble con sub-modelos especializados por zona
+
+3. **Análisis temporal más rico:**
+   - Tendencias multi-año (no solo `año` lineal)
+   - Estacionalidad intra-anual más granular
+
+4. **Resolver `region_nan`:**
+   - Imputar región usando coordenadas (lat/lng) cuando estén disponibles
+   - Reducir del 19.75% actual a <5%
 
 ---
 
@@ -1177,10 +1268,10 @@ El código y la metodología están disponibles de forma abierta para fines acad
 
 ---
 
-**Última actualización:** [09/02/2026]  
+**Última actualización:** 08/03/2026  
 **Versión del documento:** 1.0.0
 
-**Progreso: ~50% completado**
+**Progreso: ~60% completado**
 
 **✅ COMPLETADO:**
 1. Infraestructura y setup (día 1)
@@ -1188,19 +1279,16 @@ El código y la metodología están disponibles de forma abierta para fines acad
 3. Preprocesamiento con merge FWI (día 3)
 4. Baseline validado (día 4)
 5. Optimización XGBoost con GridSearch (día 5)
-6. README actualizado continuamente
-7. Git con 20+ commits descriptivos
+6. **Explicabilidad SHAP** (día 6)
+7. README actualizado continuamente
+8. Git con 20+ commits descriptivos
 
-**⏳ PENDIENTE (~50%):**
-1. **Explicabilidad SHAP** (día 6) ← SIGUIENTE
-   - Feature importance detallado
-   - Waterfall plots para casos específicos
-   - Summary plots globales
-2. **Métricas de negocio** (día 7)
+**⏳ PENDIENTE (~40%):**
+1. **Métricas de negocio** (día 7) ← SIGUIENTE
    - Hectáreas protegidas estimadas
    - Costes evitados
    - ROI del modelo
-3. **Documentación final** (día 8)
+2. **Documentación final** (día 8)
    - README completo
    - Conclusiones académicas
    - Limitaciones y mejoras futuras
