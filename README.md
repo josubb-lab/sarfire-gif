@@ -734,6 +734,113 @@ Trade-off aceptable: priorizar detección sobre precisión.
 
 ---
 
+### FASE 6: MÉTRICAS DE NEGOCIO (COMPLETADA) ✅
+
+**Notebook:** `06_Business_Metrics.ipynb`
+**Duración:** 1 sesión
+**Fecha:** 12 Marzo 2026
+
+### Objetivo:
+Traducir métricas técnicas (Recall 70.8%) a **valor empresarial cuantificable**:
+- Hectáreas protegidas
+- Costes evitados
+- ROI del sistema
+- Comparación vs baseline (sin modelo)
+
+### Supuestos utilizados (conservadores):
+
+| Supuesto | Valor | Justificación |
+|----------|-------|---------------|
+| **Reducción superficie con detección temprana** | 30% | Rango literatura: 20-40%. Valor conservador |
+| **Coste extinción** | 500 €/ha | Basado en MITECO 2020 (conservador) |
+| **Coste daños ambientales** | 1,500 €/ha | Estimación conservadora |
+| **Coste total** | 2,000 €/ha | Extinción + daños |
+| **Recall baseline (sin modelo)** | 40% | Detección reactiva sin predicción |
+| **Reducción baseline** | 15% | Intervención tardía vs 30% temprana |
+
+### RESULTADOS - Métricas de Negocio:
+
+#### 1. **Impacto Operativo:**
+
+| Métrica | Valor |
+|---------|-------|
+| GIF detectados | 80 de 113 (70.8%) |
+| Superficie detectada | 167,248 ha (82.9% del total) |
+| **Hectáreas protegidas/año** | **~10,000 ha** |
+| Mejora vs baseline | +35 GIF adicionales detectados |
+| Hectáreas extra protegidas | +38,063 ha vs baseline |
+
+**Observación clave:** El modelo detecta preferentemente **GIF grandes** (promedio 2,091 ha) vs GIF no detectados (promedio 1,049 ha) → coherente con dependencia de FWI extremo.
+
+#### 2. **Valor Económico:**
+
+| Concepto | Valor Anual |
+|----------|-------------|
+| Ahorro extinción | 5.0 M€ |
+| Ahorro daños ambientales | 15.1 M€ |
+| **Ahorro total** | **20.1 M€/año** |
+| Ahorro extra vs baseline | +76.1 M€ |
+
+#### 3. **ROI (Return on Investment):**
+
+| Concepto | Valor |
+|----------|-------|
+| Coste desarrollo (amortizado 5 años) | 2,000 €/año |
+| Coste infraestructura | 2,000 €/año |
+| **Coste total anual** | **4,000 €/año** |
+| **Beneficio anual** | **20.07 M€/año** |
+| **ROI** | **5,016x** |
+| **Ratio beneficio/coste** | **5,017:1** |
+
+**Interpretación:** Por cada 1€ invertido en SARFIRE-GIF → **5,016€ de retorno**.
+
+#### 4. **Comparación vs Baseline (sin modelo):**
+
+| Métrica | Baseline (sin modelo) | SARFIRE-GIF | Mejora |
+|---------|----------------------|-------------|--------|
+| Recall | 40% | 70.8% | +30.8pp |
+| GIF detectados | 45 | 80 | +35 |
+| Hectáreas protegidas | 12,111 ha | 50,174 ha | **+38,063 ha** |
+| Ahorro anual | - | 20.1 M€ | +20.1 M€ |
+
+**Conclusión:** El modelo cuadruplica las hectáreas protegidas vs sistema reactivo actual.
+
+### Visualizaciones generadas:
+
+1. **Pie chart:** Superficie detectada (82.9%) vs no detectada (17.1%)
+2. **Barras:** Hectáreas protegidas modelo (50,174 ha) vs baseline (12,111 ha)
+3. **Ahorro por categoría:** Extinción (5M€) + Daños (15.1M€) = Total (20.1M€)
+4. **ROI:** Beneficios (20.07M€) vs Costes (0.004M€) → Ratio 5,017:1
+
+### Conclusiones del análisis:
+
+✅ **Viabilidad económica demostrada:**
+- ROI de 5,016x justifica ampliamente la inversión
+- Coste de implementación insignificante vs beneficio
+- Sistema escalable y sostenible
+
+✅ **Impacto operativo sustancial:**
+- ~10,000 hectáreas protegidas anualmente
+- 35 GIF adicionales detectados vs baseline
+- Mejora 4x en capacidad de protección
+
+✅ **Beneficios no cuantificados (adicionales):**
+- Vidas humanas protegidas (evacuaciones tempranas)
+- Valor ecológico de ecosistemas preservados
+- Reducción de estrés en equipos de extinción
+- Beneficio turístico indirecto en zonas protegidas
+
+⚠️ **Limitaciones documentadas:**
+- Supuestos conservadores (podrían subestimar valor real)
+- Costes/ha basados en estimaciones (validar con datos regionales)
+- No incluye valor de vidas humanas (difícil monetizar)
+- Requiere validación empírica post-implementación
+
+💡 **Recomendación:**
+El análisis coste-beneficio justifica la implementación de SARFIRE-GIF como herramienta de apoyo a la toma de decisiones en emergencias forestales. El ROI excepcional (>5,000x) y el impacto operativo sustancial (~10,000 ha/año protegidas) demuestran el valor del sistema.
+
+---
+
 ## 💰 Métricas de Negocio
 
 ### Traducción de métricas técnicas a valor operativo
@@ -1268,10 +1375,10 @@ El código y la metodología están disponibles de forma abierta para fines acad
 
 ---
 
-**Última actualización:** 08/03/2026  
+**Última actualización:** 12/03/2026  
 **Versión del documento:** 1.0.0
 
-**Progreso: ~60% completado**
+**Progreso: ~70% completado**
 
 **✅ COMPLETADO:**
 1. Infraestructura y setup (día 1)
@@ -1279,16 +1386,13 @@ El código y la metodología están disponibles de forma abierta para fines acad
 3. Preprocesamiento con merge FWI (día 3)
 4. Baseline validado (día 4)
 5. Optimización XGBoost con GridSearch (día 5)
-6. **Explicabilidad SHAP** (día 6)
-7. README actualizado continuamente
-8. Git con 20+ commits descriptivos
+6. Explicabilidad SHAP (día 6)
+7. **Métricas de negocio** (día 7)
+8. README actualizado continuamente
+9. Git con 20+ commits descriptivos
 
-**⏳ PENDIENTE (~40%):**
-1. **Métricas de negocio** (día 7) ← SIGUIENTE
-   - Hectáreas protegidas estimadas
-   - Costes evitados
-   - ROI del modelo
-2. **Documentación final** (día 8)
+**⏳ PENDIENTE (~30%):**
+1. **Documentación final** (día 8) ← SIGUIENTE
    - README completo
    - Conclusiones académicas
    - Limitaciones y mejoras futuras
