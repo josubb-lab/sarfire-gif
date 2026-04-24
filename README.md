@@ -18,12 +18,13 @@
 7. [Evaluación y Métricas](#evaluación-y-métricas)
 8. [Explicabilidad](#explicabilidad)
 9. [Conclusiones Finales del Proyecto](#conclusiones-finales-del-proyecto)
-10. [Métricas de Negocio](#métricas-de-negocio)
-11. [Resultados](#resultados)
-12. [Modelo en Producción (Conceptual)](#modelo-en-producción-conceptual)
-13. [Conclusiones y Trabajo Futuro](#conclusiones-y-trabajo-futuro)
-14. [Reproducibilidad](#reproducibilidad)
-15. [Referencias](#referencias)
+10. [Limitaciones Conocidas](#limitaciones-conocidas)
+11. [Métricas de Negocio](#métricas-de-negocio)
+12. [Resultados](#resultados)
+13. [Modelo en Producción (Conceptual)](#modelo-en-producción-conceptual)
+14. [Conclusiones y Trabajo Futuro](#conclusiones-y-trabajo-futuro)
+15. [Reproducibilidad](#reproducibilidad)
+16. [Referencias](#referencias)
 
 ---
 
@@ -921,6 +922,117 @@ El análisis coste-beneficio justifica la implementación de SARFIRE-GIF como he
 - Modelo ligero (XGBoost, <1MB) → deployment en edge/móvil
 - Inferencia rápida (<100ms por predicción)
 - Actualización anual con nuevos datos (reentrenamiento automático)
+
+---
+
+## ⚠️ LIMITACIONES CONOCIDAS
+
+### Limitaciones técnicas del modelo:
+
+**1. Falsos Negativos (33 GIF no detectados - 29.2%):**
+- **Características:** Probabilidad promedio 27.8%, FWI moderado (1.4-1.5)
+- **Causa probable:** GIF causados por factores locales no capturados:
+  - Orografía específica (valles, cortafuegos ausentes)
+  - Vientos puntuales no reflejados en FWI provincial
+  - Combustible acumulado en zonas no monitorizadas
+- **Impacto:** 34,608 hectáreas no protegidas (~17% del total)
+- **Mitigación posible:** Features adicionales (pendiente, orientación, días sin lluvia)
+
+**2. Falsos Positivos (2,761 alertas innecesarias):**
+- **Trade-off aceptado:** Priorizar detección (Recall) sobre precisión (Precision 2.8%)
+- **Contexto operativo:** Movilización preventiva es preferible a no detectar GIF
+- **Filtrado posible:** Umbrales de probabilidad adaptativos por región
+
+**3. Dependencia de FWI:**
+- **Observación:** Variables meteorológicas (fwi_max, fwi_p90, fwi_mean) suman ~50% importancia SHAP
+- **Riesgo:** Si FWI tiene errores de medición → modelo hereda el error
+- **Validación necesaria:** Contrastar FWI con datos AEMET directos (no solo dataset Civio)
+
+**4. Generalización temporal:**
+- **Train:** 1968-2015 (48 años)
+- **Test:** 2016-2020 (5 años)
+- **Riesgo:** Cambio climático acelerado post-2020 podría afectar patrones
+- **Reentrenamiento recomendado:** Anual con nuevos datos
+
+### Limitaciones de los datos:
+
+**1. Coordenadas faltantes (18.6%):**
+- **Problema:** 54,435 incendios sin lat/lng
+- **Solución adoptada:** Merge FWI por provincia (no requiere coordenadas exactas)
+- **Consecuencia:** Pérdida de precisión espacial en ~1 de cada 5 incendios
+- **Mejora posible:** Imputar coordenadas usando municipio + geocoding
+
+**2. Municipio "INDETERMINADO" (19.75%):**
+- **Problema:** Casi 1 de cada 5 incendios sin municipio asignado
+- **Decisión:** Excluido de features en baseline por ruido excesivo
+- **Consecuencia:** Feature potencialmente útil descartado
+- **Trabajo futuro:** Investigar si municipio_encoded mejora con limpieza de "INDETERMINADO"
+
+**3. Datos incompletos 2021-2023:**
+- **Problema:** Solo 1,137 incendios en 3 años (vs ~10K esperados)
+- **Decisión:** Período excluido del análisis
+- **Consecuencia:** Modelo no entrenado con datos más recientes
+- **Actualización necesaria:** Incorporar datos completos cuando estén disponibles
+
+**4. Desbalanceo extremo (147:1):**
+- **Realidad:** GIF son eventos raros (<1% de incendios)
+- **Manejo:** `scale_pos_weight=200` en XGBoost
+- **Limitación inherente:** Precision siempre será baja con este desbalanceo
+- **Aceptable:** En contexto operativo (priorizar Recall)
+
+### Limitaciones de las métricas de negocio:
+
+**1. Supuestos conservadores no validados empíricamente:**
+
+| Supuesto | Valor usado | Fuente | Validación pendiente |
+|----------|-------------|--------|---------------------|
+| Reducción superficie (detección temprana) | 30% | Literatura (rango 20-40%) | Estudios regionales España |
+| Coste extinción | 500 €/ha | Estimación MITECO 2020 | Datos reales por provincia |
+| Coste daños ambientales | 1,500 €/ha | Estimación conservadora | Valoración ecosistemas |
+| Recall baseline (sin modelo) | 40% | Estimación razonable | Histórico real de detección |
+
+**2. Beneficios no cuantificados:**
+- **Vidas humanas protegidas:** Difícil de monetizar, no incluido en ROI
+- **Valor ecológico:** Biodiversidad preservada no tiene precio de mercado
+- **Beneficio turístico:** Zonas no quemadas atraen turismo (indirecto)
+- **Salud pública:** Reducción de humo/contaminación (no cuantificado)
+
+**3. Costes no incluidos:**
+- **Formación de usuarios:** Bomberos deben aprender a usar el sistema
+- **Integración con sistemas existentes:** APIs, dashboards
+- **Mantenimiento de datos:** Actualización anual FWI, reentrenamiento
+
+### Limitaciones de alcance:
+
+**1. Solo predicción binaria (GIF sí/no):**
+- **No predice:** Superficie exacta quemada, dirección de propagación, duración
+- **Trabajo futuro:** Modelo de regresión para estimar hectáreas
+
+**2. Horizonte temporal limitado:**
+- **Predicción:** Basada en condiciones actuales (FWI del día)
+- **No predice:** GIF con 7 días de antelación (requiere forecast meteorológico)
+- **Mejora posible:** Integrar predicciones FWI futuras (modelos AEMET)
+
+**3. Geografía limitada a España:**
+- **Entrenamiento:** Solo incendios España 1968-2020
+- **Generalización dudosa:** Aplicar modelo en otros países sin reentrenamiento
+- **Adaptación necesaria:** Calibrar por región climática
+
+### Reproducibilidad y deployment:
+
+**1. Dependencias externas:**
+- **Datos FWI:** Requiere acceso continuo a fuente (Civio o AEMET)
+- **APIs:** Si FWI viene de API, caídas afectan predicción
+- **Solución:** Cache local de datos históricos
+
+**2. Entorno específico:**
+- **Python 3.12, WSL Ubuntu:** Reproducible pero requiere setup
+- **Modelos serializados:** `xgb_optimized.joblib` depende de versión XGBoost
+- **Documentado:** `requirements.txt` especifica versiones exactas
+
+**3. Sin CI/CD:**
+- **No hay:** Tests automatizados, pipelines de deployment
+- **Trabajo futuro:** Implementar si se lleva a producción
 
 ---
 
