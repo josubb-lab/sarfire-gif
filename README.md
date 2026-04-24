@@ -19,12 +19,13 @@
 8. [Explicabilidad](#explicabilidad)
 9. [Conclusiones Finales del Proyecto](#conclusiones-finales-del-proyecto)
 10. [Limitaciones Conocidas](#limitaciones-conocidas)
-11. [Métricas de Negocio](#métricas-de-negocio)
-12. [Resultados](#resultados)
-13. [Modelo en Producción (Conceptual)](#modelo-en-producción-conceptual)
-14. [Conclusiones y Trabajo Futuro](#conclusiones-y-trabajo-futuro)
-15. [Reproducibilidad](#reproducibilidad)
-16. [Referencias](#referencias)
+11. [Trabajo Futuro](#trabajo-futuro)
+12. [Métricas de Negocio](#métricas-de-negocio)
+13. [Resultados](#resultados)
+14. [Modelo en Producción (Conceptual)](#modelo-en-producción-conceptual)
+15. [Conclusiones y Trabajo Futuro](#conclusiones-y-trabajo-futuro)
+16. [Reproducibilidad](#reproducibilidad)
+17. [Referencias](#referencias)
 
 ---
 
@@ -1033,6 +1034,151 @@ El análisis coste-beneficio justifica la implementación de SARFIRE-GIF como he
 **3. Sin CI/CD:**
 - **No hay:** Tests automatizados, pipelines de deployment
 - **Trabajo futuro:** Implementar si se lleva a producción
+
+---
+
+## 🚀 TRABAJO FUTURO
+
+### Mejoras técnicas del modelo:
+
+**1. Optimización adicional del Recall (objetivo: 85%+):**
+
+**Opción A: SMOTE (Synthetic Minority Over-sampling)**
+- **Qué:** Generar ejemplos sintéticos de GIF para balancear dataset
+- **Implementación:** `imblearn.combine.SMOTETomek` + validación temporal
+- **Riesgo:** Data leakage si no se aplica SOLO en train
+- **Ganancia estimada:** +5-10pp Recall (75-80%)
+
+**Opción B: Feature engineering avanzado**
+- **Features de interacción:** `fwi_max * region_Sur`, `fwi_p90 * mes_8`
+- **Features temporales:** Días acumulados sin lluvia, sequía previa
+- **Features espaciales:** Pendiente, orientación (si disponible)
+- **Ganancia estimada:** +3-7pp Recall
+
+**Opción C: Ensemble de modelos**
+- **Estrategia:** Voting Classifier (XGBoost + LightGBM + Random Forest)
+- **Ventaja:** Reduce varianza, captura patrones complementarios
+- **Ganancia estimada:** +2-5pp Recall
+
+**2. Resolver municipio_encoded (19.75% "INDETERMINADO"):**
+- **Imputar municipio:** Usando lat/lng + geocoding reverso
+- **Resultado esperado:** Reducir "INDETERMINADO" de 19.75% → <5%
+- **Impacto:** municipio_encoded podría aportar señal útil (orografía local)
+
+**3. Modelo de regresión para superficie quemada:**
+- **Objetivo:** Predecir hectáreas exactas, no solo GIF sí/no
+- **Utilidad:** Priorizar recursos según magnitud esperada
+- **Técnica:** XGBoost Regressor sobre log(superficie)
+
+**4. Predicción con horizonte temporal (7 días):**
+- **Requisito:** Integrar forecasts meteorológicos (FWI futuro)
+- **Fuente:** Predicciones AEMET a 7 días
+- **Impacto:** Planificación preventiva vs reactiva
+
+### Integración con SARFIRE-RAG (Proyecto 2 TFM):
+
+**Sistema completo integrado:**
+
+```
+┌─────────────────────────────────────────────────┐
+│           SARFIRE INTEGRADO                     │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  ┌──────────────┐         ┌─────────────────┐  │
+│  │ SARFIRE-GIF  │ ──────> │  SARFIRE-RAG    │  │
+│  │ (Predicción) │         │  (Asistente)    │  │
+│  └──────────────┘         └─────────────────┘  │
+│         │                          │            │
+│         │                          │            │
+│    Probabilidad                Protocolo        │
+│    GIF: 87%                    actuación        │
+│    Zona: Ávila                 DTF-13           │
+│                                                 │
+│  ┌──────────────────────────────────────────┐  │
+│  │     Dashboard Operativo                  │  │
+│  │  - Mapa de riesgo en tiempo real         │  │
+│  │  - Alertas automáticas                   │  │
+│  │  - Recomendaciones protocolarias         │  │
+│  └──────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+**Flujo integrado:**
+1. **SARFIRE-GIF** detecta probabilidad GIF alta (>70%) en Ávila
+2. **Alerta automática** a centro de coordinación
+3. **SARFIRE-RAG** proporciona:
+   - Protocolo de actuación específico (según DTF-13)
+   - Checklist de recursos necesarios
+   - Casos históricos similares
+4. **Dashboard** muestra mapa con zonas de riesgo + recomendaciones
+
+### Deployment en producción:
+
+**Fase 1: MVP Operativo (3 meses)**
+- **API REST:** FastAPI con endpoint `/predict` (recibe fecha, provincia → probabilidad GIF)
+- **Dashboard web:** Streamlit o Gradio con mapa interactivo
+- **Alertas:** Email/SMS automáticos si probabilidad > umbral
+- **Monitoreo:** Logs de predicciones, métricas de uso
+
+**Fase 2: Integración con sistemas existentes (6 meses)**
+- **BDCIF:** Integrar con Base de Datos de Causas de Incendios Forestales
+- **112:** Conexión con centros de emergencias regionales
+- **AEMET:** Pipeline automático de datos FWI actualizados
+
+**Fase 3: Escalado nacional (12 meses)**
+- **Despliegue multi-región:** Coordinación entre CCAA
+- **Reentrenamiento automático:** MLOps con MLflow + Airflow
+- **App móvil:** Para bomberos en campo
+
+### Investigación adicional:
+
+**1. Análisis causal (no solo predictivo):**
+- **Pregunta:** ¿Qué causa que un incendio se convierta en GIF?
+- **Técnica:** Causal inference, Structural Equation Modeling
+- **Valor:** Insights para prevención (no solo predicción)
+
+**2. Explicabilidad avanzada:**
+- **Counterfactuals:** "Si FWI hubiera sido 10% menor, ¿habría sido GIF?"
+- **Análisis de sensibilidad:** ¿Qué feature cambiar para reducir riesgo?
+- **Comunicación:** Explicaciones para público no técnico
+
+**3. Transfer learning a otras regiones:**
+- **Objetivo:** Adaptar modelo España → Portugal, Grecia, California
+- **Técnica:** Fine-tuning con pocos datos locales
+- **Validación:** Evaluar generalización cross-country
+
+**4. Series temporales con Deep Learning:**
+- **Modelo:** LSTM/Transformer sobre secuencias FWI diarias
+- **Ventaja:** Captura dinámicas temporales complejas
+- **Desventaja:** Requiere más datos, menos interpretable
+
+### Colaboraciones y validación:
+
+**1. Validación con expertos de dominio:**
+- **Necesario:** Contrastar resultados con jefes de extinción
+- **Objetivo:** Validar que 70.8% Recall es útil operativamente
+- **Feedback:** Identificar mejoras desde experiencia de campo
+
+**2. Publicación académica:**
+- **Venue:** Congresos de Machine Learning aplicado (ECML, KDD)
+- **Tema:** "Predicting Large Wildfires with Imbalanced XGBoost and SHAP"
+- **Impacto:** Difusión en comunidad científica
+
+**3. Open Source:**
+- **Licencia:** MIT o Apache 2.0
+- **Repositorio público:** GitHub con documentación completa
+- **Contribuciones:** Abrir a comunidad (firefighters, data scientists)
+
+### Hoja de ruta estimada:
+
+| Fase | Duración | Prioridad | Entregable |
+|------|----------|-----------|------------|
+| **Cerrar TFM** | 1 semana | 🔴 Crítica | Documentación final, notebooks reproducibles |
+| **Optimización a 85% Recall** | 2-3 semanas | 🟡 Alta | Notebook 07 con SMOTE/Ensemble |
+| **Integración SARFIRE-RAG** | 1 mes | 🟡 Alta | Sistema multi-agente completo |
+| **MVP Producción** | 3 meses | 🟢 Media | API + Dashboard operativo |
+| **Validación con bomberos** | 2 meses | 🟢 Media | Informe de validación de campo |
+| **Publicación académica** | 6 meses | 🔵 Baja | Paper en conferencia ML |
 
 ---
 
