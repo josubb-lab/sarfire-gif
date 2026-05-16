@@ -1,3 +1,12 @@
+---
+title: SARFIRE-GIF API
+emoji: 🔥
+colorFrom: red
+colorTo: orange
+sdk: docker
+pinned: false
+---
+
 # 🔥 SARFIRE-GIF: Clasificación de Grandes Incendios Forestales
 
 > **Proyecto 1 del TFM - Máster en Data Science con IA (BIG School)**  
